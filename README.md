@@ -1,3 +1,4 @@
+팀 레포: https://github.com/TheSSEN-Observer
 # 🎯 Radar Signal Processing Pipeline
 
 > **라즈베리파이5 기반 실시간 레이더 신호처리 파이프라인**  
