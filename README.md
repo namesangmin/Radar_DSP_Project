@@ -2,14 +2,14 @@
  **팀 레포: https://github.com/TheSSEN-Observer**
 ---
 
-# 🎯 Radar Signal Processing Pipeline
+# Radar Signal Processing Pipeline
 
 > **라즈베리파이5 기반 실시간 레이더 신호처리 파이프라인**  
 > Real-time Radar Signal Processing Pipeline on Raspberry Pi 5 (Cortex-A76, 4-core)
 
 ---
 
-## 📋 개요
+## 개요
 
 UDP로 수신된 레이더 IQ 데이터를 실시간으로 처리하는 멀티스레드 파이프라인입니다.  
 dwell 주기 **51.2ms** 이내에 Pulse Compress → Transpose → Doppler FFT → CFAR → Cluster까지 완료합니다.
@@ -21,7 +21,7 @@ UDP 수신 → Pulse Compress → Transpose → Doppler FFT → CFAR → Cluster
 
 ---
 
-## 🏗 파이프라인 구조
+## 파이프라인 구조
 
 ```
 CPU 0  [loader ]  UDP 수신 및 버퍼 재조합
@@ -36,7 +36,7 @@ CPU 3  [post   ]  Transpose → Doppler FFT → CFAR → Cluster → 전송
 
 ---
 
-## ⚙️ 최적화 항목
+## 최적화 항목
 
 | 항목 | 비교 대상 | 선택 | 근거 |
 |---|---|---|---|
@@ -58,7 +58,7 @@ CPU 3  [post   ]  Transpose → Doppler FFT → CFAR → Cluster → 전송
 
 ---
 
-## 🚀 빌드 및 실행
+## 빌드 및 실행
 
 ### 의존성
 
@@ -116,7 +116,7 @@ done
 
 ---
 
-## 📁 프로젝트 구조
+## 프로젝트 구조
 
 ```
 ├── Inc/
@@ -165,7 +165,7 @@ done
 
 ---
 
-## 🔧 설계 원칙
+## 설계 원칙
 
 ### 팩토리 패턴 (Factory Pattern)
 
@@ -207,7 +207,7 @@ if (done == 512) {
 
 ---
 
-## 📊 레이더 파라미터
+## 레이더 파라미터
 
 | 파라미터 | 값 |
 |---|---|
@@ -222,7 +222,7 @@ if (done == 512) {
 
 ---
 
-## 🖥 환경
+## 환경
 
 | 항목 | 사양 |
 |---|---|
