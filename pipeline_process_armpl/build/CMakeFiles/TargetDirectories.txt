@@ -1,3 +1,0 @@
-/home/sigprocess/sangmin/git/DSP/pipeline_process_armpl/build/CMakeFiles/radarBench.dir
-/home/sigprocess/sangmin/git/DSP/pipeline_process_armpl/build/CMakeFiles/edit_cache.dir
-/home/sigprocess/sangmin/git/DSP/pipeline_process_armpl/build/CMakeFiles/rebuild_cache.dir
