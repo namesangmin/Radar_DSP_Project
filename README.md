@@ -1,5 +1,4 @@
-
- **팀 레포: https://github.com/TheSSEN-Observer**
+**팀 레포: https://github.com/TheSSEN-Observer**
 ---
 
 # Radar Signal Processing Pipeline
@@ -15,9 +14,20 @@ UDP로 수신된 레이더 IQ 데이터를 실시간으로 처리하는 멀티�
 dwell 주기 **51.2ms** 이내에 Pulse Compress → Transpose → Doppler FFT → CFAR → Cluster까지 완료합니다.
 
 ```
-UDP 수신 → Pulse Compress → Transpose → Doppler FFT → CFAR → Cluster → 결과 전송
-  (36ms)       (~3ms)         (~3.5ms)     (~2.7ms)    (~3.5ms) (~0.5ms)
+UDP 수신 → Pulse Compress → Transpose → MTI → MTD(Doppler FFT) → CFAR → Cluster → 결과 전송
 ```
+
+## 결과
+
+신호처리 시간 **48.4ms → 16.4ms**, 51.2ms 주기 안에서 연속 처리
+
+| 항목 | 선택 | 결과 |
+|---|---|---|
+| Worker 수 | 2개 | 20.9 → 16.4ms |
+| 동기화 방식 | futex | lock-free 대비 CPU cycles 4.4배 적음 |
+| 분배 방식 | Half (연속 블록) | 16.99 → 16.4ms |
+| 메모리 배치 | PulseMajor | 53.7 → 16.4ms |
+| Transpose | Tiled (16×16) | ArmPL 21.5 → 16.4ms |
 
 ---
 
@@ -34,27 +44,68 @@ CPU 3  [post   ]  Transpose → Doppler FFT → CFAR → Cluster → 전송
 - **futex 큐**: loader → worker, worker → post 간 데이터 전달
 - **atomic done_count**: 두 worker가 512개 pulse를 모두 완료하면 post에 자동 알림
 
----
+### 처리 흐름 (시퀀스 다이어그램)
 
-## 최적화 항목
+한 dwell이 수신부터 결과 전송까지 처리되는 흐름입니다.
 
-| 항목 | 비교 대상 | 선택 | 근거 |
-|---|---|---|---|
-| Queue 방식 | mutex / lockfree / usleep / **futex** | **futex** | cycles 최소, 편차 최소 (2.77B) |
-| Worker 수 | 1개 / **2개** | **2개** | compress_ms 50% 감소 |
-| Dispatch 방식 | evenodd / **half** | **half** | 연속 메모리 블록, 캐시 친화적 |
-| 메모리 레이아웃 | legacy / **default** | **default** | PC stride 접근 제거 |
-| Transpose | tiling / **comatcopy** | 측정 결과에 따라 | TILE=16 or ARMPL SIMD |
+```mermaid
+sequenceDiagram
+    autonumber
+    participant SIM as 신호모의기
+    participant L as Loader (CPU0)
+    participant W0 as Worker0 (CPU1)
+    participant W1 as Worker1 (CPU2)
+    participant P as Post (CPU3)
+    participant OP as 운용통제 PC
 
-### Queue 성능 비교 (5회 평균, perf stat)
+    Note over L,P: 시작: queue_open 후 pthread_create로 4개 스레드 생성, 각 스레드가 pin_thread_to_cpu로 코어 고정
+    Note over W0,P: 큐가 비어 있으면 FUTEX_WAIT으로 잠들어 있음
 
-| 지표 | lockfree | mutex | usleep | **futex** |
-|---|---|---|---|---|
-| cycles (B) | 113.56 | 40.73 | 38.59 | **38.47** |
-| stalled-backend (%) | 27.59 | 59.44 | 57.12 | **57.78** |
-| elapsed (s) | 14.88 | 14.99 | 14.71 | **14.62** |
-| user time (s) | 44.39 | 11.93 | 11.20 | **11.48** |
-| cycles 편차 (B) | - | 8.18 | - | **2.77** |
+    loop dwell 반복 (최대 340개, 버퍼 idx = dwell 번호 % 2)
+        L->>L: pulse_compress_map[idx] BUF_FREE 대기 후 BUF_FILLING
+        loop 패킷 수신 (첫 패킷은 ICD 헤더)
+            SIM->>L: recvfrom IQ 패킷 (UDP 9000)
+        end
+        L->>L: dwell_id, phi 저장 후 layout_store_raw로 raw_data[idx]에 복사
+        loop 펄스 p = 0 ~ 511 (dispatch_half)
+            L->>W0: queue_push_pulse (p < 256)
+            L->>W1: queue_push_pulse (p >= 256)
+        end
+        Note over L,W1: push는 깨우지 않음. 512개를 다 넣은 뒤 한 번에 깨움
+        L->>W0: queue_flush_pulse (FUTEX_WAKE)
+        L->>W1: queue_flush_pulse (FUTEX_WAKE)
+
+        par 다음 dwell 수신 (다른 버퍼 idx^1)
+            SIM->>L: recvfrom 다음 dwell 패킷
+        and 현재 dwell 처리 (버퍼 idx)
+            par Worker0
+                loop 펄스 0 ~ 255
+                    W0->>W0: queue_pop_pulse, layout_run_pc 펄스 압축, 처리 시간 누적, done_count +1
+                end
+            and Worker1
+                loop 펄스 256 ~ 511
+                    W1->>W1: queue_pop_pulse, layout_run_pc 펄스 압축, 처리 시간 누적, done_count +1
+                end
+            end
+            Note over W0,W1: done_count가 512가 된 Worker (둘 중 마지막에 끝낸 쪽)
+            W1->>W1: pulse_compress_map[idx] BUF_READY
+            W1->>P: queue_push_post(idx) + FUTEX_WAKE
+            P->>P: queue_pop_post, 두 Worker 중 긴 압축 시간 기록, BUF_PROCESSING
+            P->>P: transpose_exec (Tiled 16x16)
+            P->>P: doppler_fft_processing (MTI, MTD)
+            P->>P: cfar_detect
+            P->>P: cluster_detections
+            P->>OP: udp_loop 표적 거리, 속도와 단계별 처리 시간 (UDP 7777)
+            P->>OP: send_graph_data 그래프 데이터 (TCP 9999)
+            P->>P: done_count = 0, BUF_FREE (버퍼 반환), 결과 누적 후 timing 초기화
+        end
+    end
+
+    L->>W0: queue_close_pulse (340 dwell 완료)
+    L->>W1: queue_close_pulse
+    W1->>P: 마지막 Worker가 queue_close_post (active_workers == 0)
+    Note over L,P: 오류 시: 어느 스레드든 pipe->error = 1로 바꾸고, 나머지 스레드는 루프마다 이를 확인해 빠져나옴
+```
 
 ---
 
