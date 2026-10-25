@@ -107,6 +107,15 @@ sequenceDiagram
     Note over L,P: 오류 시: 어느 스레드든 pipe->error = 1로 바꾸고, 나머지 스레드는 루프마다 이를 확인해 빠져나옴
 ```
 
+### 처리 시간 (타이밍)
+
+![Double Buffering 기반 파이프라인 동작](docs/timing.png)
+
+- 신호모의기는 51.2ms마다 dwell 하나를 보내고, Core 0은 이를 약 36ms 동안 수신합니다.
+- 수신이 끝나면 Core 1, 2가 Pulse Compression(약 3.1ms), Core 3이 나머지 신호처리(약 13.3ms)를 이어서 합니다. 한 dwell의 신호처리 시간은 두 단계를 합친 **16.4ms**입니다.
+- 버퍼를 두 개 번갈아 쓰기 때문에, Core 3이 이전 dwell을 처리하고 전송(약 12.85ms)하는 동안 Core 0은 다음 dwell을 다른 버퍼에 받습니다.
+- 수신과 처리가 서로 다른 코어에서 겹쳐 진행되므로 두 시간을 더할 필요가 없고, 다음 dwell을 다 받기 전에 이전 dwell의 처리와 전송이 끝나 51.2ms 주기를 지킵니다.
+
 ---
 
 ## 빌드 및 실행
