@@ -118,6 +118,15 @@ sequenceDiagram
 
 ---
 
+## 폴더 구성
+
+| 폴더 | 설명 |
+|---|---|
+| `pipeline_process_armpl/` | **최종 버전**. 4코어 파이프라인과 ArmPL, 최적화를 모두 적용 (이 README의 결과와 설명 기준) |
+| `pipeline_process/` | 중간 버전. 멀티스레드 파이프라인 구조 적용, ArmPL 적용 전 |
+| `single_core/` | 초기 버전. 단일 스레드로 전체 신호처리 |
+
+---
 ## 빌드 및 실행
 
 ### 의존성
@@ -215,7 +224,7 @@ done
 │   ├── layout/                     # 레이아웃 구현체
 │   ├── settings/                   # pipeline_set.c, core_set.c
 │   ├── thread/                     # loader/worker/post 스레드
-│   ├── pulse.c                     # Pulse Compress (FFTW3 기반)
+│   ├── pulse.c                     # Pulse Compress (FFTW3, ARMPL 기반)
 │   ├── doppler.c               # Doppler FFT, MTI, MTD
 │   ├── cfar.c                      # CFAR 탐지
 │   └── cluster.c                   # 클러스터링
