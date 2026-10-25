@@ -122,10 +122,9 @@ sequenceDiagram
 
 | 폴더 | 설명 |
 |---|---|
-| `pipeline_process_armpl/` | **최종 버전**. 4코어 파이프라인과 ArmPL, 최적화를 모두 적용 (이 README의 결과와 설명 기준) |
-| `pipeline_process/` | 중간 버전. 멀티스레드 파이프라인 구조 적용, ArmPL 적용 전 |
-| `single_core/` | 초기 버전. 단일 스레드로 전체 신호처리 |
-
+| `pipeline_process_armpl/` | **최종 버전**. 4코어 파이프라인에 ArmPL FFT, 큐 방식 교체 구조, 메모리 배치, Transpose 최적화까지 적용 (이 README의 결과와 설명 기준) |
+| `pipeline_process/` | 중간 버전. 4코어 파이프라인 구조만 적용 (FFT는 직접 구현, Worker 짝홀 분배) |
+| `single_core/` | 초기 버전. 단일 스레드로 전체 신호처리 (FFT는 직접 구현) |
 ---
 ## 빌드 및 실행
 
